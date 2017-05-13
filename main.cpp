@@ -23,9 +23,19 @@ int main (int argc, char *argv[])
                             "Wrong input arguments!");
       return -1;
     }
+
       
-  action = tool_bar->addAction ("&Change function", graph_area, SLOT (change_func ()));
-  action->setShortcut (QString ("Ctrl+C"));
+  action = tool_bar->addAction ("Change &function", graph_area, SLOT (change_func ()));
+  action->setShortcut (QString ("Ctrl+F"));
+
+  action = tool_bar->addAction ("Change &method", graph_area, SLOT (change_method ()));
+  action->setShortcut (QString ("Ctrl+M"));
+
+  action = tool_bar->addAction ("&Increase dots amount x2", graph_area, SLOT (increase_dots ()));
+  action->setShortcut (QString ("Ctrl+I"));
+
+  action = tool_bar->addAction ("&Decrease dots amount x2", graph_area, SLOT (decrease_dots ()));
+  action->setShortcut (QString ("Ctrl+D"));
 
   action = tool_bar->addAction ("E&xit", window, SLOT (close ()));
   action->setShortcut (QString ("Ctrl+X"));

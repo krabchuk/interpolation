@@ -7,18 +7,21 @@
 
 #define DEFAULT_A -10
 #define DEFAULT_B 10
-#define DEFAULT_N 10
+#define DEFAULT_N 8
+
+#define MAX_N 1048576
+
 
 static
 double f_0 (double x)
 {
-  return exp (x);
+  return x + sin (x);
 }
 
 static
 double f_1 (double x)
 {
-  return x * x * x;
+  return x * x;
 }
 
 Window::Window (QWidget *parent)
@@ -28,9 +31,63 @@ Window::Window (QWidget *parent)
   b = DEFAULT_B;
   n = DEFAULT_N;
 
-  func_id = 0;
+  newton_x = new double [2 * MAX_N];
+  memset (newton_x, 0, 2 * MAX_N);
 
+  newton_y = new double [2 * MAX_N];
+  memset (newton_y, 0, 2 * MAX_N);
+
+  spline_c1 = new double [2 * MAX_N];
+  spline_c2 = new double [2 * MAX_N];
+  spline_c3 = new double [2 * MAX_N];
+  spline_c4 = new double [2 * MAX_N];
+
+  memset (spline_c1, 0, 2 * MAX_N);
+  memset (spline_c2, 0, 2 * MAX_N);
+  memset (spline_c3, 0, 2 * MAX_N);
+  memset (spline_c4, 0, 2 * MAX_N);
+
+  spline_centr = new double [2 * MAX_N];
+  spline_left = new double [2 * MAX_N];
+  spline_right = new double [2 * MAX_N];
+
+  memset (spline_centr, 0, 2 * MAX_N);
+  memset (spline_left, 0, 2 * MAX_N);
+  memset (spline_right, 0, 2 * MAX_N);
+
+  answer = new double [2 * MAX_N];
+  memset (answer, 0, 2 * MAX_N);
+
+  diff = new double [2 * MAX_N];
+  memset (diff, 0, 2 * MAX_N);
+
+  rhs = new double [2 * MAX_N];
+  memset (rhs, 0, 2 * MAX_N);
+
+  func_id = 0;
+  method_id = 0;
+  error = 0;
+  m_name = "newton";
   change_func ();
+}
+
+Window::~Window ()
+{
+  delete [] newton_x;
+  delete [] newton_y;
+
+  delete [] spline_c1;
+  delete [] spline_c2;
+  delete [] spline_c3;
+  delete [] spline_c4;
+
+  delete [] spline_centr;
+  delete [] spline_left;
+  delete [] spline_right;
+
+  delete [] diff;
+
+  delete [] rhs;
 }
 
 QSize Window::minimumSizeHint () const
@@ -55,7 +112,8 @@ int Window::parse_command_line (int argc, char *argv[])
       || sscanf (argv[2], "%lf", &b) != 1
       || b - a < 1.e-6
       || (argc > 3 && sscanf (argv[3], "%d", &n) != 1)
-      || n <= 0)
+      || n <= 0
+      || n > MAX_N)
     return -2;
 
   return 0;
@@ -69,75 +127,242 @@ void Window::change_func ()
   switch (func_id)
     {
       case 0:
-        f_name = "f (x) = x";
+        f_name = "f (x) = x + sin (x)";
         f = f_0;
         break;
       case 1:
-        f_name = "f (x) = x * x * x";
+        f_name = "f (x) = x * x";
         f = f_1;
         break;
     }
+
+  update_data ();
   update ();
+}
+
+void Window::change_method ()
+{
+  method_id = (method_id + 1) % 4;
+
+  if ((method_id == 0 || method_id == 2) && n > 64)
+    {
+      n = 64;
+    }
+  if ((method_id == 1 || method_id == 3) && n < 3)
+    {
+      n = 4;
+    }
+
+  update_data ();
+  update ();
+}
+
+void Window::increase_dots ()
+{
+  if (method_id == 0 || method_id == 2)
+    {
+      if (n > 30)
+        error = "too many dots";
+      else
+        {
+          n *= 2;
+          error = 0;
+        }
+    }
+  else
+    {
+      if (n > MAX_N / 2)
+        error = "too many dots";
+      else
+        {
+          n *= 2;
+          error = 0;
+        }
+    }
+  update_data ();
+  update ();
+}
+
+void Window::decrease_dots ()
+{
+  if (method_id == 0 || method_id == 2)
+    {
+      if (n < 3)
+        error = "too less dots";
+      else
+        {
+          n /= 2;
+          error = 0;
+        }
+    }
+  else
+    {
+      if (n < 5)
+        error = "too less dots";
+      else
+        {
+          n /= 2;
+          error = 0;
+        }
+    }
+  update_data ();
+  update ();
+}
+
+void
+Window::update_data ()
+{
+  switch (method_id)
+    {
+    case 0:
+      {
+        init_newton ();
+        break;
+      }
+    case 1:
+      {
+        init_spline ();
+        break;
+      }
+    case 2:
+      {
+        init_newton ();
+        break;
+      }
+    case 3:
+      {
+        init_spline ();
+        break;
+      }
+    }
 }
 
 /// render graph
 void Window::paintEvent (QPaintEvent * /* event */)
 {  
   QPainter painter (this);
-  double x1, x2, y1, y2;
-  double max_y, min_y;
-  double delta_y, delta_x = (b - a) / n;
-
-  painter.setPen ("black");
-
-  // calculate min and max for current function
-  max_y = min_y = 0;
-  for (x1 = a; x1 - b < 1.e-6; x1 += delta_x)
-    {
-      y1 = f (x1);
-      if (y1 < min_y)
-        min_y = y1;
-      if (y1 > max_y)
-        max_y = y1;
-    }
-
-  delta_y = 0.01 * (max_y - min_y);
-  min_y -= delta_y;
-  max_y += delta_y;
 
   // save current Coordinate System
   painter.save ();
 
-  // make Coordinate Transformations
-  painter.translate (0.5 * width (), 0.5 * height ());
-  painter.scale (width () / (b - a), -height () / (max_y - min_y));
-  painter.translate (-0.5 * (a + b), -0.5 * (min_y + max_y));
+  // init
+  init_painter (&painter);
 
-  // draw approximated line for graph
-  painter.setPen ("blue");
-  x1 = a;
-  y1 = f (x1);
-  for (x2 = x1 + delta_x; x2 - b < 1.e-6; x2 += delta_x) 
+  if (method_id < 2)
     {
-      y2 = f (x2);
-      painter.drawLine (QPointF (x1, y1), QPointF (x2, y2));
+      // draw exact function
 
-      x1 = x2, y1 = y2;
+      painter.setPen ("orange");
+
+      double step = (b - a) / width ();
+      double dot_x1 = 0, dot_y1 = 0, dot_x2 = 0, dot_y2 = 0;
+
+      dot_x1 = a;
+      dot_y1 = f (a);
+
+      for (int i = 1; i < width(); i++)
+        {
+          dot_x2 = a + i * step;
+          dot_y2 = f (dot_x2);
+
+          painter.drawLine (QPointF(dot_x1, dot_y1), QPointF(dot_x2, dot_y2));
+
+          dot_x1 = dot_x2;
+          dot_y1 = dot_y2;
+        }
+
     }
-  x2 = b;
-  y2 = f (x2);
-  painter.drawLine (QPointF (x1, y1), QPointF (x2, y2));
 
-  // draw axis
-  painter.setPen ("black");
-  painter.drawLine (a, 0, b, 0);
-  painter.drawLine (0, max_y, 0, min_y);
+  switch (method_id)
+    {
+    case 0:
+      {
+        painter.setPen ("blue");
 
-  // restore previously saved Coordinate System
+        double dot_x1 = 0, dot_y1 = 0, dot_x2 = 0, dot_y2 = 0;
+        double step = (b - a) / width ();
+
+        dot_x1 = a;
+        dot_y1 = calc_newton (a);
+
+        for (int i = 1; i < width(); i++)
+          {
+            dot_x2 = a + i * step;
+            dot_y2 = calc_newton (dot_x2);
+
+            painter.drawLine (QPointF(dot_x1, dot_y1), QPointF(dot_x2, dot_y2));
+
+            dot_x1 = dot_x2;
+            dot_y1 = dot_y2;
+          }
+
+        painter.drawLine (QPointF(dot_x1, dot_y1), QPointF(b, f (b)));
+
+        break;
+      }
+    case 1:
+      {
+        painter.setPen ("green");
+
+        double dot_x1 = 0, dot_y1 = 0, dot_x2 = 0, dot_y2 = 0;
+        double step = (b - a) / width ();
+
+        dot_x1 = a;
+        dot_y1 = calc_spline (a);
+
+        for (int i = 1; i < width(); i++)
+          {
+            dot_x2 = a + i * step;
+            dot_y2 = calc_spline (dot_x2);
+
+            painter.drawLine (QPointF(dot_x1, dot_y1), QPointF(dot_x2, dot_y2));
+
+            dot_x1 = dot_x2;
+            dot_y1 = dot_y2;
+          }
+
+        painter.drawLine (QPointF(dot_x1, dot_y1), QPointF(b, f (b)));
+
+        break;
+      }
+    case 2:
+      {
+        painter.setPen ("blue");
+
+        double dot_x1 = 0, dot_y1 = 0;
+        double step = (b - a) / width ();
+
+        for (int i = 0; i < width(); i++)
+          {
+            dot_x1 = a + i * step;
+            dot_y1 = fabs (f (dot_x1) - calc_newton (dot_x1));
+
+            painter.drawLine (QPointF(dot_x1, 0), QPointF(dot_x1, dot_y1));
+
+          }
+
+        break;
+      }
+    case 3:
+      {
+        painter.setPen ("green");
+
+        double dot_x1 = 0, dot_y1 = 0;
+        double step = (b - a) / width ();
+
+        for (int i = 0; i < width(); i++)
+          {
+            dot_x1 = a + i * step;
+            dot_y1 = fabs (f (dot_x1) - calc_spline (dot_x1));
+
+            painter.drawLine (QPointF(dot_x1, 0), QPointF(dot_x1, dot_y1));
+
+          }
+
+        break;
+      }
+    }
+
+
   painter.restore ();
-
-  // render function name
-  painter.setPen ("blue");
-  painter.drawText (0, 20, f_name);
-
 }
