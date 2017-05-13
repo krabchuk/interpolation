@@ -1,0 +1,12 @@
+D   0x404ea2             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0
+D   0x404eb0             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0
+D   0x404ec1             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0
+D   0x404ed2             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0
+D   0x404ee3             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0
+D   0x404ef4             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0
+D   0x404f05             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0
+D   0x404f13             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0
+D   0x404f24             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0
+D   0x404f35             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0
+D   0x404f46             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0
+D   0x405139             # delete non alloc or twice pointer 0x7ff07ff07ff07ff0

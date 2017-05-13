@@ -47,5 +47,10 @@ int main (int argc, char *argv[])
   window->setWindowTitle ("Graph");
 
   window->show ();
-  return app.exec ();
+  app.exec ();
+
+
+  delete window;
+
+  return 0;
 }

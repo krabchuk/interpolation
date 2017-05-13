@@ -21,73 +21,99 @@ double f_0 (double x)
 static
 double f_1 (double x)
 {
-  return x * x;
+  return x * x * x;
 }
 
 Window::Window (QWidget *parent)
   : QWidget (parent)
 {
+  parent_save = parent;
+
   a = DEFAULT_A;
   b = DEFAULT_B;
   n = DEFAULT_N;
 
-  newton_x = new double [2 * MAX_N];
-  memset (newton_x, 0, 2 * MAX_N);
-
-  newton_y = new double [2 * MAX_N];
-  memset (newton_y, 0, 2 * MAX_N);
-
-  spline_c1 = new double [2 * MAX_N];
-  spline_c2 = new double [2 * MAX_N];
-  spline_c3 = new double [2 * MAX_N];
-  spline_c4 = new double [2 * MAX_N];
-
-  memset (spline_c1, 0, 2 * MAX_N);
-  memset (spline_c2, 0, 2 * MAX_N);
-  memset (spline_c3, 0, 2 * MAX_N);
-  memset (spline_c4, 0, 2 * MAX_N);
-
-  spline_centr = new double [2 * MAX_N];
-  spline_left = new double [2 * MAX_N];
-  spline_right = new double [2 * MAX_N];
-
-  memset (spline_centr, 0, 2 * MAX_N);
-  memset (spline_left, 0, 2 * MAX_N);
-  memset (spline_right, 0, 2 * MAX_N);
-
-  answer = new double [2 * MAX_N];
-  memset (answer, 0, 2 * MAX_N);
-
-  diff = new double [2 * MAX_N];
-  memset (diff, 0, 2 * MAX_N);
-
-  rhs = new double [2 * MAX_N];
-  memset (rhs, 0, 2 * MAX_N);
-
   func_id = 0;
   method_id = 0;
   error = 0;
-  m_name = "newton";
+  m_name.append ("newton");
   change_func ();
 }
 
 Window::~Window ()
 {
-  delete [] newton_x;
-  delete [] newton_y;
+  destruction ();
+}
 
-  delete [] spline_c1;
-  delete [] spline_c2;
-  delete [] spline_c3;
-  delete [] spline_c4;
+void Window::allocation (int m)
+{
+  newton_x = new double [m + 5];
+  //memset (newton_x, 0, m + 5);
 
-  delete [] spline_centr;
-  delete [] spline_left;
-  delete [] spline_right;
+  newton_y = new double [m + 5];
+  //memset (newton_y, 0, m + 5);
 
-  delete [] diff;
+  spline_c1 = new double [m + 5];
+  spline_c2 = new double [m + 5];
+  spline_c3 = new double [m + 5];
+  spline_c4 = new double [m + 5];
 
-  delete [] rhs;
+//  memset (spline_c1, 0, m + 5);
+//  memset (spline_c2, 0, m + 5);
+//  memset (spline_c3, 0, m + 5);
+//  memset (spline_c4, 0, m + 5);
+
+  spline_centr = new double [m + 5];
+  spline_left = new double [m + 5];
+  spline_right = new double [m + 5];
+
+//  memset (spline_centr, 0, m + 5);
+//  memset (spline_left, 0, m + 5);
+//  memset (spline_right, 0, m + 5);
+
+  answer = new double [m + 5];
+  //memset (answer, 0, m + 5);
+
+  diff = new double [m + 5];
+  //memset (diff, 0, m + 5);
+
+  rhs = new double [m + 5];
+  //memset (rhs, 0, m + 5);
+}
+
+void Window::destruction ()
+{
+  if (newton_x)
+    delete [] newton_x;
+  if (newton_y)
+    delete [] newton_y;
+  if (spline_c1)
+    delete [] spline_c1;
+  if (spline_c2)
+    delete [] spline_c2;
+  if (spline_c3)
+    delete [] spline_c3;
+  if (spline_c4)
+    delete [] spline_c4;
+  if (spline_centr)
+    delete [] spline_centr;
+  if (spline_left)
+    delete [] spline_left;
+  if (spline_right)
+    delete [] spline_right;
+  if (answer)
+    delete [] answer;
+  if (diff)
+    delete [] diff;
+  if (rhs)
+    delete [] rhs;
+}
+
+void
+Window::exit_all ()
+{
+  parent_save->close ();
+  delete this;
 }
 
 QSize Window::minimumSizeHint () const
@@ -112,12 +138,12 @@ int Window::parse_command_line (int argc, char *argv[])
       || sscanf (argv[2], "%lf", &b) != 1
       || b - a < 1.e-6
       || (argc > 3 && sscanf (argv[3], "%d", &n) != 1)
-      || n <= 0
-      || n > MAX_N)
+      || n <= 0)
     return -2;
 
   return 0;
 }
+
 
 /// change current function for drawing
 void Window::change_func ()
@@ -171,9 +197,6 @@ void Window::increase_dots ()
     }
   else
     {
-      if (n > MAX_N / 2)
-        error = "too many dots";
-      else
         {
           n *= 2;
           error = 0;
@@ -212,6 +235,8 @@ void Window::decrease_dots ()
 void
 Window::update_data ()
 {
+  destruction ();
+  allocation (2 * n);
   switch (method_id)
     {
     case 0:

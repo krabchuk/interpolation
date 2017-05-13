@@ -31,6 +31,7 @@ private:
   double *rhs;
   double *answer;
   double *diff;
+  QWidget *parent_save;
 
 public:
   Window (QWidget *parent);
@@ -56,6 +57,9 @@ public slots:
 
   void init_spline ();
   double calc_spline (double x);
+  void exit_all ();
+  void allocation (int n);
+  void destruction ();
 
 
 protected:
