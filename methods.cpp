@@ -9,6 +9,7 @@
 
 #define DELTA 0.01
 #define MIN 1e-15
+#define DEBUG 0
 
 void
 Window::init_newton ()
@@ -54,20 +55,26 @@ solve_matrix (double *a, double *b, double *c, double *rhs, double *x, int n)
 {
   int i;
 
-  c[0] /= b[0];
-  for (i = 1; i < n - 1; i++)
+
+  for (i = 0; i < n - 1; i++)
     {
-      b[i] -= a[i - 1] * c[i - 1];
       c[i] /= b[i];
+      rhs[i] /= b[i];
+
+      b[i + 1] -= c[i] * a[i + 1];
+      rhs[i + 1] -= rhs[i] * a[i + 1];
     }
-  b[n - 1] -= a[n - 2] * c[n - 2];
+  rhs[n - 1] /= b[n - 1];
 
-  x[0] = rhs[0] / b[0];
-  for (i = 1; i < n; i++)
-    x[i] = (rhs[i] - a[i - 1] * x[i - 1]) / b[i];
+  for (i = n - 1; i > 0; i--)
+    {
+      rhs[i - 1] -= rhs[i] * c[i - 1];
+    }
 
-  for (i = n - 2; i >= 0; i--)
-    x[i] -= c[i] * x[i + 1];
+  for (i = 0; i < n; i++)
+    {
+      x[i] = rhs[i];
+    }
 }
 
 
@@ -90,13 +97,14 @@ Window::init_spline ()
 
   //build matrix and rhs
 
-  spline_left[0] = newton_x[2] - newton_x[1];
-  spline_centr[0] = newton_x[2] - newton_x[0];
-  spline_right[0] = 0;
+  spline_left[0] = 0;
+  spline_centr[0] = newton_x[2] - newton_x[1];
+  spline_right[0] = newton_x[2] - newton_x[0];
 
   rhs[0] = (diff[1] * (newton_x[2] - newton_x[1]) * (2 * newton_x[2] + newton_x[1] - 3 * newton_x[0])
           + diff[2] * (newton_x[1] - newton_x[0]) * (newton_x[1] - newton_x[0]))
           / (newton_x[2] - newton_x[0]);
+  //printf ("(%f * (%f - %f) * (2 * %f + %f - 3 * %f) + %f * (%f - %f * %f - %f))\n", diff[1],newton_x[2],newton_x[1],newton_x[2],newton_x[1],newton_x[0],diff[2],newton_x[1],newton_x[0],newton_x[1],newton_x[0]);
 
   for (int i = 1; i < n - 1; i++)
     {
@@ -104,20 +112,41 @@ Window::init_spline ()
       spline_centr[i] = 2 * (newton_x[i + 1] - newton_x[i - 1]);
       spline_right[i] = newton_x[i] - newton_x[i - 1];
 
-      rhs[i] = 3 * diff[i - 1] * (newton_x[i + 1] - newton_x[i])
-              + 3 * diff[i] * (newton_x[i] - newton_x[i - 1]);
+      rhs[i] = 3 * diff[i] * (newton_x[i + 1] - newton_x[i])
+              + 3 * diff[i + 1] * (newton_x[i] - newton_x[i - 1]);
     }
 
-  spline_left[n - 1] = 0;
-  spline_centr[n - 1] = newton_x[n - 1] - newton_x[(n - 1) - 2];
-  spline_right[n - 1] = newton_x[(n - 1) - 1] - newton_x[(n - 1) - 2];
+  spline_left[n - 1] = newton_x[n - 1] - newton_x[(n - 1) - 2];
+  spline_centr[n - 1] = newton_x[(n - 1) - 1] - newton_x[(n - 1) - 2];
+  spline_right[n - 1] = 0;
 
   rhs[n - 1] = (diff[n - 2] * (newton_x[n - 1] - newton_x[(n - 1) - 1]) * (newton_x[n - 1] - newton_x[(n - 1) - 1])
               + diff[n - 1] * (newton_x[(n - 1) - 1] - newton_x[(n - 1) - 2])
                * (3 * newton_x[n - 1] - newton_x[(n - 1) - 1] - 2 * newton_x[(n - 1) - 2]))
               / (newton_x[n - 1] - newton_x[(n - 1) - 2]);
 
+#if DEBUG
+  for (int i = 0; i < n - 1; i++)
+    {
+      printf ("i = %d c1 = %f c2 = %f c3 = %f c4 = %f\n",i, spline_c1[i], spline_c2[i], spline_c3[i], spline_c4[i]);
+      printf ("diff = %f\n", diff[i + 1]);
+    }
+  printf ("\n");
+  for (int i = 0; i < n; i++)
+    {
+      printf ("i = %d left = %f center = %f right = %f\n", i, spline_left[i], spline_centr[i], spline_right[i]);
+      printf ("i = %d rhs = %f\n", i, rhs[i]);
+      printf ("i = %d newton x = %f newton y = %f\n", i, newton_x[i], newton_y[i]);
+    }
+#endif
+
   solve_matrix (spline_left, spline_centr, spline_right, rhs, answer, n);
+#if DEBUG
+  for (int i = 0; i < n; i++)
+    {
+      printf ("rhs = %f\n", rhs[i]);
+    }
+#endif
 
   //calc exact coeffs
 
@@ -132,6 +161,16 @@ Window::init_spline ()
       spline_c4[i] = (answer[i] + answer[i + 1] - 2 * diff[i + 1]) / ((newton_x[i + 1] - newton_x[i]) * (newton_x[i + 1] - newton_x[i]));
     }
 
+#if DEBUG
+  for (int i = 0; i < n - 1; i++)
+    {
+      printf ("i = %d c1 = %f c2 = %f c3 = %f c4 = %f\n",i, spline_c1[i], spline_c2[i], spline_c3[i], spline_c4[i]);
+    }
+  for (int i = 0; i < n; i++)
+    {
+      printf ("answer = %f\n", answer[i]);
+    }
+#endif
 }
 
 double

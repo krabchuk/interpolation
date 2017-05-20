@@ -8,6 +8,7 @@
 
 #define DELTA 0.01
 #define MIN 1e-15
+#define MIN_FOR_DRAW 1e-6
 
 void
 Window::init_painter (QPainter *painter)
@@ -50,13 +51,12 @@ Window::init_painter (QPainter *painter)
             }
         }
 
-      if (max_y < 0.0001)
-        max_y = 0.0001;
-//      if (fabs (min_y - max_y) < MIN_FOR_DRAW)
-//        {
-//          min_y = 1.;
-//          max_y = 2.;
-//        }
+      painter->drawText (width () - 200, 40, QString::number(max_y));
+
+      if (fabs (max_y) < MIN_FOR_DRAW)
+        {
+          max_y = MIN_FOR_DRAW;
+        }
     }
   else
     {

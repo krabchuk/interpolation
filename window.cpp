@@ -5,9 +5,9 @@
 
 #include "window.h"
 
-#define DEFAULT_A -10
-#define DEFAULT_B 10
-#define DEFAULT_N 8
+#define DEFAULT_A 0
+#define DEFAULT_B 1
+#define DEFAULT_N 4
 
 #define MAX_N 1048576
 
@@ -15,13 +15,13 @@
 static
 double f_0 (double x)
 {
-  return x + sin (x);
+  return x;
 }
 
 static
 double f_1 (double x)
 {
-  return x * x * x;
+  return exp (x);
 }
 
 Window::Window (QWidget *parent)
@@ -33,10 +33,22 @@ Window::Window (QWidget *parent)
   b = DEFAULT_B;
   n = DEFAULT_N;
 
-  func_id = 0;
-  method_id = 0;
+  func_id = 1;
+  method_id = 1;
   error = 0;
-  m_name.append ("newton");
+  m_name.append ("spline");
+  newton_x = 0;
+  newton_y = 0;
+  spline_c1 = 0;
+  spline_c2 = 0;
+  spline_c3 = 0;
+  spline_c4 = 0;
+  answer = 0;
+  diff = 0;
+  rhs = 0;
+  spline_centr = 0;
+  spline_left = 0;
+  spline_right = 0;
   change_func ();
 }
 
@@ -48,37 +60,37 @@ Window::~Window ()
 void Window::allocation (int m)
 {
   newton_x = new double [m + 5];
-  //memset (newton_x, 0, m + 5);
+  memset (newton_x, 0, m + 5);
 
   newton_y = new double [m + 5];
-  //memset (newton_y, 0, m + 5);
+  memset (newton_y, 0, m + 5);
 
   spline_c1 = new double [m + 5];
   spline_c2 = new double [m + 5];
   spline_c3 = new double [m + 5];
   spline_c4 = new double [m + 5];
 
-//  memset (spline_c1, 0, m + 5);
-//  memset (spline_c2, 0, m + 5);
-//  memset (spline_c3, 0, m + 5);
-//  memset (spline_c4, 0, m + 5);
+  memset (spline_c1, 0, m + 5);
+  memset (spline_c2, 0, m + 5);
+  memset (spline_c3, 0, m + 5);
+  memset (spline_c4, 0, m + 5);
 
   spline_centr = new double [m + 5];
   spline_left = new double [m + 5];
   spline_right = new double [m + 5];
 
-//  memset (spline_centr, 0, m + 5);
-//  memset (spline_left, 0, m + 5);
-//  memset (spline_right, 0, m + 5);
+  memset (spline_centr, 0, m + 5);
+  memset (spline_left, 0, m + 5);
+  memset (spline_right, 0, m + 5);
 
   answer = new double [m + 5];
-  //memset (answer, 0, m + 5);
+  memset (answer, 0, m + 5);
 
   diff = new double [m + 5];
-  //memset (diff, 0, m + 5);
+  memset (diff, 0, m + 5);
 
   rhs = new double [m + 5];
-  //memset (rhs, 0, m + 5);
+  memset (rhs, 0, m + 5);
 }
 
 void Window::destruction ()
@@ -136,10 +148,23 @@ int Window::parse_command_line (int argc, char *argv[])
 
   if (   sscanf (argv[1], "%lf", &a) != 1
       || sscanf (argv[2], "%lf", &b) != 1
-      || b - a < 1.e-6
+      || b - a < 1.e-10
       || (argc > 3 && sscanf (argv[3], "%d", &n) != 1)
       || n <= 0)
     return -2;
+
+  newton_x = 0;
+  newton_y = 0;
+  spline_c1 = 0;
+  spline_c2 = 0;
+  spline_c3 = 0;
+  spline_c4 = 0;
+  answer = 0;
+  diff = 0;
+  rhs = 0;
+  spline_centr = 0;
+  spline_left = 0;
+  spline_right = 0;
 
   return 0;
 }
@@ -153,7 +178,7 @@ void Window::change_func ()
   switch (func_id)
     {
       case 0:
-        f_name = "f (x) = x + sin (x)";
+        f_name = "f (x) = x";
         f = f_0;
         break;
       case 1:
